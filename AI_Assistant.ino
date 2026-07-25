@@ -1,7 +1,10 @@
 #include <WiFi.h>
+#include <HTTPClient.h>
 
 
-constexpr int buttonPin = 2;
+constexpr int stackCheckButtonPin = 1;
+constexpr int ledButtonPin = 2;
+constexpr int RGBLedPin = 48;
 
 const char* ssid = "CMCC-3fXC";
 const char* password = "5hnvu3fa";
@@ -10,17 +13,42 @@ bool ledState = false;
 volatile unsigned long lastInterruptTime = 0;
 
 
-SemaphoreHandle_t buttonSemaphore;
-TaskHandle_t buttonTaskHandle;
+TaskHandle_t ledTaskHandle;
+TaskHandle_t wifiTaskHandle;
+TaskHandle_t httpTaskHandle;
+TaskHandle_t stackCheckHandle;
 
 
-void IRAM_ATTR buttonledState() {
+
+void IRAM_ATTR ledButton() {
   unsigned long currentTime = millis();
 
   if (currentTime - lastInterruptTime > 100) {
-    xSemaphoreGiveFromISR(
-      buttonSemaphore,
-      NULL);
+    BaseType_t higherPriorityTaskWoken = pdFALSE;
+
+    vTaskNotifyGiveFromISR(
+      ledTaskHandle,
+      &higherPriorityTaskWoken
+    );
+
+    portYIELD_FROM_ISR(higherPriorityTaskWoken);
+  }
+
+  lastInterruptTime = currentTime;
+}
+
+void IRAM_ATTR stackCheckButton() {
+  unsigned long currentTime = millis();
+
+  if (currentTime - lastInterruptTime > 100) {
+    BaseType_t higherPriorityTaskWoken = pdFALSE;
+
+    vTaskNotifyGiveFromISR(
+      stackCheckHandle,
+      &higherPriorityTaskWoken
+    );
+
+    portYIELD_FROM_ISR(higherPriorityTaskWoken);
   }
 
   lastInterruptTime = currentTime;
@@ -30,19 +58,30 @@ void IRAM_ATTR buttonledState() {
 void setup() {
   Serial.begin(115200);
 
-  pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(ledButtonPin, INPUT_PULLUP);
+  pinMode(stackCheckButtonPin, INPUT_PULLUP);
 
-  attachInterrupt(buttonPin, buttonledState, FALLING);
+  attachInterrupt(ledButtonPin, ledButton, FALLING);
+  attachInterrupt(stackCheckButtonPin, stackCheckButton, FALLING);
 
 
-  buttonSemaphore = xSemaphoreCreateBinary();
+  xTaskCreatePinnedToCore(
+    stackCheckTask,
+    "StackCheckTask",
+    2048,
+    NULL,
+    1,
+    &stackCheckHandle,
+    1
+  );
+
   xTaskCreatePinnedToCore(
     buttonTask,
     "ButtonTask",
     2048,
     NULL,
     1,
-    &buttonTaskHandle,
+    &ledTaskHandle,
     1
   );
 
@@ -51,15 +90,93 @@ void setup() {
     "WiFiTask",
     4096,
     NULL,
-    2,
-    NULL,
+    3,
+    &wifiTaskHandle,
     0
+  );
+
+  xTaskCreatePinnedToCore(
+    httpTask,
+    "HttpTask",
+    4096,
+    NULL,
+    2,
+    &httpTaskHandle,
+    1
   );
 }
 
 
+void stackCheckTask(void* pvParameters) {
+  while(1) {
+    ulTaskNotifyTake(
+      pdTRUE,
+      portMAX_DELAY
+    );
+    
+    Serial.printf(
+      "buttonTask stack left: %u\n", 
+      uxTaskGetStackHighWaterMark(ledTaskHandle)
+    );
+    Serial.printf(
+      "wifiTask stack left: %u\n", 
+      uxTaskGetStackHighWaterMark(wifiTaskHandle)
+    );
+    Serial.printf(
+      "httpTask stack left: %u\n", 
+      uxTaskGetStackHighWaterMark(httpTaskHandle)
+    );
+
+    Serial.printf(
+      "stackCheck stack left: %u\n", 
+      uxTaskGetStackHighWaterMark(NULL)
+    );
+  }
+}
+
+void httpTask(void* pvParameters) {
+  while (1) {
+    ulTaskNotifyTake(
+      pdTRUE,
+      portMAX_DELAY
+    );
+
+    if (WiFi.status() == WL_CONNECTED) {
+      HTTPClient http;
+      
+      http.begin("http://httpbin.org/post");
+
+      int httpCode = http.GET();
+
+      if (httpCode > 0) {
+        Serial.printf("HTTP Code: %d\n", httpCode);
+
+        String response = http.getString();
+
+        Serial.println(response);
+      } else {
+        Serial.printf("GET Failed: %s\n", http.errorToString(httpCode).c_str());
+      }
+
+      http.end();
+    }
+  }
+}
+
 void wifiTask(void* pvParameters) {
+  Serial.println("Connecting WiFi");
   WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+
+  Serial.println();
+  Serial.println("Connected");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+
 
   while (1) {
     if (WiFi.status() != WL_CONNECTED) {
@@ -67,39 +184,34 @@ void wifiTask(void* pvParameters) {
       WiFi.reconnect();
     }
 
-    Serial.printf(
-      "WiFiTask stack Left: %u\n",
-      uxTaskGetStackHighWaterMark(NULL)
-    );
-
     vTaskDelay(pdMS_TO_TICKS(5000));
   }
 }
 
 void buttonTask(void* pvParameters) {
   while (1) {
-    xSemaphoreTake(
-      buttonSemaphore,
-      portMAX_DELAY);
+    ulTaskNotifyTake(
+      pdTRUE,
+      portMAX_DELAY
+    );
 
     if (!ledState) {
       // turn LED on:
-      rgbLedWrite(48, 0, 255, 0);
+      rgbLedWrite(RGBLedPin, 0, 255, 0);
       ledState = !ledState;
     } else {
       // turn LED off:
-      rgbLedWrite(48, 0, 0, 0);
+      rgbLedWrite(RGBLedPin, 0, 0, 0);
       ledState = !ledState;
     }
 
-    // Serial.printf(
-    //   "ButtonTask stack Left: %u\n",
-    //   uxTaskGetStackHighWaterMark(NULL)
-    // );
+    xTaskNotifyGive(httpTaskHandle);
+    // taskYIELD();
+
+
   }
 }
 
 
 
-void loop() {
-}
+void loop() {}
