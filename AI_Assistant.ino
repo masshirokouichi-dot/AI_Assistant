@@ -68,7 +68,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     stackCheckTask,
     "StackCheckTask",
-    2048,
+    3072,
     NULL,
     1,
     &stackCheckHandle,
@@ -146,7 +146,17 @@ void httpTask(void* pvParameters) {
       
       http.begin("http://httpbin.org/post");
 
-      int httpCode = http.GET();
+      http.addHeader(
+        "Content-Type",
+        "application/json"
+      );
+      String body = R"({
+        "name": "ESP32",
+        "number": "S3"
+      })";
+
+      // int httpCode = http.GET();
+      int httpCode = http.POST(body);
 
       if (httpCode > 0) {
         Serial.printf("HTTP Code: %d\n", httpCode);
@@ -155,7 +165,7 @@ void httpTask(void* pvParameters) {
 
         Serial.println(response);
       } else {
-        Serial.printf("GET Failed: %s\n", http.errorToString(httpCode).c_str());
+        Serial.printf("Failed: %s\n", http.errorToString(httpCode).c_str());
       }
 
       http.end();
