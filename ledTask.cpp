@@ -3,46 +3,37 @@
 #include "global.h"
 
 
-bool ledState = false;
-
-
-void IRAM_ATTR ledButton() {
-  unsigned long currentTime = millis();
-
-  if (currentTime - lastInterruptTime > 100) {
-    BaseType_t higherPriorityTaskWoken = pdFALSE;
-
-    vTaskNotifyGiveFromISR(
-      ledTaskHandle,
-      &higherPriorityTaskWoken
-    );
-
-    portYIELD_FROM_ISR(higherPriorityTaskWoken);
-  }
-
-  lastInterruptTime = currentTime;
-}
+// bool ledState = false;
+uint32_t status;
 
 void ledTask(void* pvParameters) {
   while (1) {
-    ulTaskNotifyTake(
-      pdTRUE,
+    xTaskNotifyWait(
+      0,
+      0,
+      &status,
       portMAX_DELAY
     );
 
-    if (!ledState) {
-      // turn LED on:
-      rgbLedWrite(RGBLedPin, 0, 255, 0);
-      ledState = !ledState;
-    } else {
-      // turn LED off:
-      rgbLedWrite(RGBLedPin, 0, 0, 0);
-      ledState = !ledState;
+    switch (status) {
+      case HTTP_WAITING:
+        rgbLedWrite(RGBLedPin, 0, 0, 255);  // blue
+        break;
+      case HTTP_SUCCESS:
+        rgbLedWrite(RGBLedPin, 0, 255, 0);  // green
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        rgbLedWrite(RGBLedPin, 0, 0, 0);
+        break;
+      case HTTP_WARNING:
+        rgbLedWrite(RGBLedPin, 255, 255, 0);  // yellow
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        rgbLedWrite(RGBLedPin, 0, 0, 0);
+        break;
+      default:
+        rgbLedWrite(RGBLedPin, 255, 0, 0);  // red
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        rgbLedWrite(RGBLedPin, 0, 0, 0);
+        break;
     }
-
-    xTaskNotifyGive(httpTaskHandle);
-    // taskYIELD();
-
-
   }
 }

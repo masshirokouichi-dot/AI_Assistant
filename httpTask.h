@@ -4,7 +4,9 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WifiClientSecure.h>
 
 void httpTask(void* pvParameters);
+void notifyToLed(uint32_t status);
 
 #endif 

@@ -10,4 +10,11 @@ extern TaskHandle_t stackCheckHandle;
 
 extern volatile unsigned long lastInterruptTime;
 
+enum HttpStatus: uint32_t{
+  HTTP_WAITING = 0,
+  HTTP_SUCCESS = 1,
+  HTTP_WARNING = 2,
+  HTTP_FAILED = 3
+};
+
 #endif

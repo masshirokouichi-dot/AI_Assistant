@@ -4,7 +4,9 @@
 #include "global.h"
 #include "httpTask.h"
 #include "stackCheckTask.h"
+#include "ledButton.h"
 
+#include <ArduinoJson.h>
 
 
 void setup() {
@@ -15,6 +17,19 @@ void setup() {
 
   attachInterrupt(ledButtonPin, ledButton, FALLING);
   attachInterrupt(stackCheckButtonPin, stackCheckButton, FALLING);
+
+  // JsonDocument doc;
+  // doc["name"] = "ESP32";
+  // doc["chip"] = "S3";
+
+  // String output;
+
+  // serializeJson(
+  //   doc,
+  //   output
+  // );
+
+  // Serial.println(output);
 
 
   xTaskCreatePinnedToCore(
@@ -50,7 +65,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     httpTask,
     "HttpTask",
-    4096,
+    6144,
     NULL,
     2,
     &httpTaskHandle,
