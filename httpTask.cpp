@@ -1,5 +1,25 @@
-#include "httpTask.h"
 #include "global.h"
+#include "config.h"
+#include "httpTask.h"
+
+constexpr AIConfig aiConfig[] = {
+  {
+    "https: //httpbing.org/post",
+    ""
+  },
+  {
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+    ""
+  },
+  {
+    "https://api.deepseek.com/chat/completions",
+    ""
+  },
+  {
+    "http://192.168.1.30:8080/askGemini",
+    ""
+  }
+};
 
 
 void httpTask(void* pvParameters) {
@@ -10,27 +30,52 @@ void httpTask(void* pvParameters) {
     );
 
     if (WiFi.status() == WL_CONNECTED) {
-      WiFiClientSecure client;
-      client.setInsecure();
+      WiFiClient client;
+      // client.setInsecure();
       HTTPClient http;
+
+      
+
       http.begin(
         client,
-        "https://httpbin.org/post"
+        getAIConfig(model).url
       );
+
+    // switch(model) {
+    //   case AIModel::GEMINI: 
+    //     // http.addHeader(
+    //     //   "x-goog-api-key",
+    //     //   getAIConfig(model).apiKey
+    //     // );
+    //     break;
+    //   case AIModel::DEEPSEEK:
+    //     http.addHeader(
+    //       "Authorization",
+    //       String("Bearer ") + getAIConfig(model).apiKey
+    //     );
+    //     break;
+    //   default: break;
+    // }
+
 
       http.addHeader(
         "Content-Type",
         "application/json"
       );
+
       String body = R"({
-        "name": "ESP32",
-        "chip": "S3"
+        "contents": [
+          {
+            "text": "测试：能否看得到那段日语写的回答要求？"
+          }
+        ]
       })";
 
 
+
       notifyToLed(HTTP_WAITING);
-      // int httpCode = http.GET();
       int httpCode = http.POST(body);
+      // int httpCode = http.GET();
       
 
       if (httpCode > 0) {
@@ -63,3 +108,6 @@ void notifyToLed(uint32_t status) {
   );
 }
 
+const AIConfig& getAIConfig(AIModel model) {
+  return aiConfig[static_cast<int>(model)];
+}

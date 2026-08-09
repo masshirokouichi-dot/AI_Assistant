@@ -3,7 +3,6 @@
 #include "global.h"
 
 
-// bool ledState = false;
 uint32_t status;
 
 void ledTask(void* pvParameters) {

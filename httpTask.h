@@ -8,5 +8,6 @@
 
 void httpTask(void* pvParameters);
 void notifyToLed(uint32_t status);
+const AIConfig& getAIConfig(AIModel Model);
 
 #endif 

@@ -16,5 +16,16 @@ enum HttpStatus: uint32_t{
   HTTP_WARNING = 2,
   HTTP_FAILED = 3
 };
+enum class AIModel {
+  HTTPBIN,
+  GEMINI,
+  DEEPSEEK,
+  PC
+};
+
+struct AIConfig {
+  const char* url;
+  const char* apiKey;
+};
 
 #endif
