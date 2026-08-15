@@ -5,6 +5,7 @@
 #include "httpTask.h"
 #include "stackCheckTask.h"
 #include "ledButton.h"
+#include "camera.h"
 
 #include <ArduinoJson.h>
 
@@ -12,24 +13,13 @@
 void setup() {
   Serial.begin(115200);
 
+  cameraInit();
+
   pinMode(ledButtonPin, INPUT_PULLUP);
   pinMode(stackCheckButtonPin, INPUT_PULLUP);
 
   attachInterrupt(ledButtonPin, ledButton, FALLING);
   attachInterrupt(stackCheckButtonPin, stackCheckButton, FALLING);
-
-  // JsonDocument doc;
-  // doc["name"] = "ESP32";
-  // doc["chip"] = "S3";
-
-  // String output;
-
-  // serializeJson(
-  //   doc,
-  //   output
-  // );
-
-  // Serial.println(output);
 
 
   xTaskCreatePinnedToCore(

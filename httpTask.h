@@ -5,9 +5,11 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WifiClientSecure.h>
+#include <esp_camera.h>
+#include <base64.h>
 
 void httpTask(void* pvParameters);
 void notifyToLed(uint32_t status);
-const AIConfig& getAIConfig(AIModel Model);
+// const AIConfig& getAIConfig(AIModel Model);
 
 #endif 
