@@ -13,7 +13,7 @@
 void httpTask(void* pvParameters);
 
 void notifyToLed(uint32_t status);
-int process(String response, char **audioBase64);
+int process(String *response, char **audioBase64);
 int base64ToPcm(char *audioBase64, char **pcmData);
 void safeFree(void **ptr);
 // const AIConfig& getAIConfig(AIModel Model);

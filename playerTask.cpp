@@ -17,7 +17,6 @@ void playerInit() {
     I2S_SLOT_MODE_MONO
   )) {
     Serial.println("I2S init failed");
-    while (1);
   }
 
   Serial.println("I2S started");

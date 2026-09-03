@@ -72,8 +72,9 @@ void httpTask(void* pvParameters) {
         // ここから最後までbug修正
         // ptrを使った関数のデータ型を直す
         char *audioBase64 = nullptr;
-        if (process(response, &audioBase64) != 0) {
+        if (process(&response, &audioBase64) != 0) {
           safeFree((void**)&audioBase64);
+          continue;
         }
 
 
@@ -94,12 +95,12 @@ void httpTask(void* pvParameters) {
         // strcpy(audioBase64, doc["data"]);
         // Serial.println("Processing Over");
 
-        
-        if (base64ToPcm(audioBase64, &pcmData) == -1) {
-          safeFree((void**)&audioBase64);
-          safeFree((void**)&pcmData);
-        }
+        int result = base64ToPcm(audioBase64, &pcmData);
         safeFree((void**)&audioBase64);
+        if (result == -1) {
+          safeFree((void**)&pcmData);
+          continue;
+        }
 
         xTaskNotifyGive(playerTaskHandle);
       } 
@@ -108,6 +109,7 @@ void httpTask(void* pvParameters) {
         Serial.printf("Failed: %s\n", http.errorToString(httpCode).c_str());
       }
 
+      Serial.println("HttpTask Over");
       http.end();
     }
   }
@@ -118,7 +120,7 @@ void httpTask(void* pvParameters) {
 // JSONから音声データを切り出す
 int process(String response, char **audioBase64) {
   JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, response);
+  DeserializationError error = deserializeJson(doc, *response);
   if (error) {
     Serial.print("JSON parse failed: ");
     Serial.println(error.c_str());
@@ -140,8 +142,6 @@ int process(String response, char **audioBase64) {
   }
 
   strcpy(*audioBase64, data);
-
-  Serial.println("Processing Over");
 
   return 0;
 }
@@ -165,7 +165,6 @@ int base64ToPcm(char *audioBase64, char **pcmData) {
   );
   if (result != 0) {
     Serial.printf("Base64 decode failed: %d\n", result);
-    free(*pcmData);
     return -1;
   }
 
