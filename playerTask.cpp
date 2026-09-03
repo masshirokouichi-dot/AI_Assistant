@@ -35,6 +35,8 @@ void playerTask(void* pvParameters){
         CHUNK_SIZE,
         decodedLength - offset
       );
+
+      // ボリュームを下げる
       int16_t *samples = (int16_t *)(pcmData + offset);
       for (size_t i = 0; i < length / 2; i++) {
           samples[i] *= volume;

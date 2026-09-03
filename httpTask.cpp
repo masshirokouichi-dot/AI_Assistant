@@ -118,7 +118,9 @@ void httpTask(void* pvParameters) {
 
 
 // JSONから音声データを切り出す
-int process(String response, char **audioBase64) {
+int process(String *response, char **audioBase64) {
+  Serial.print("response length = ");
+  Serial.println(response->length());
   JsonDocument doc;
   DeserializationError error = deserializeJson(doc, *response);
   if (error) {
