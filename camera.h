@@ -3,8 +3,9 @@
 
 #include <Arduino.h>
 #include <esp_camera.h>
+#include <base64.h>
 
 void cameraInit();
-void cameraTake();
+int cameraTake(String *p);
 
 #endif

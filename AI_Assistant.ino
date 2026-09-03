@@ -6,6 +6,7 @@
 #include "stackCheckTask.h"
 #include "ledButton.h"
 #include "camera.h"
+#include "playerTask.h"
 
 #include <ArduinoJson.h>
 
@@ -14,6 +15,7 @@ void setup() {
   Serial.begin(115200);
 
   cameraInit();
+  playerInit();
 
   pinMode(ledButtonPin, INPUT_PULLUP);
   pinMode(stackCheckButtonPin, INPUT_PULLUP);
@@ -59,6 +61,16 @@ void setup() {
     NULL,
     2,
     &httpTaskHandle,
+    1
+  );
+
+  xTaskCreatePinnedToCore(
+    playerTask,
+    "PlayerTask",
+    4096,
+    NULL,
+    2,
+    &playerTaskHandle,
     1
   );
 }

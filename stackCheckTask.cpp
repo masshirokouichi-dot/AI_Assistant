@@ -39,8 +39,31 @@ void stackCheckTask(void* pvParameters) {
     );
 
     Serial.printf(
+        "PSRAM total: %u\n",
+        ESP.getPsramSize()
+    );
+    Serial.printf(
+        "PSRAM free: %u\n",
+        ESP.getFreePsram()
+    );
+    Serial.printf(
+        "PSRAM minimum free: %u\n",
+        heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM)
+    );
+
+    Serial.printf("Free heap: %u\n", ESP.getFreeHeap());
+    Serial.printf("Free PSRAM: %u\n", ESP.getFreePsram());
+    Serial.printf(
+        "Largest block: %u\n",
+        heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)
+    );
+    
+
+    
+    Serial.printf(
       "stackCheck stack left: %u\n", 
       uxTaskGetStackHighWaterMark(NULL)
     );
+
   }
 }

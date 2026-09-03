@@ -1,25 +1,7 @@
 #include "global.h"
 #include "config.h"
+#include "camera.h"
 #include "httpTask.h"
-
-// constexpr AIConfig aiConfig[] = {
-//   {
-//     "https: //httpbin.org/post",
-//     ""
-//   },
-//   {
-//     "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
-//     ""
-//   },
-//   {
-//     "https://api.deepseek.com/chat/completions",
-//     ""
-//   },
-//   {
-//     "http://192.168.1.30:8080/askGemini",
-//     ""
-//   }
-// };
 
 
 void httpTask(void* pvParameters) {
@@ -28,23 +10,11 @@ void httpTask(void* pvParameters) {
       pdTRUE,
       portMAX_DELAY
     );
-
-    camera_fb_t * fb = esp_camera_fb_get();
-
-    if (fb == nullptr) {
-      Serial.println("Camera capture failed");
+  
+    String imageBase64;
+    if (cameraTake(&imageBase64) != 0) {
       notifyToLed(HTTP_FAILED);
-      continue;
     }
-    Serial.printf(
-      "Photo: %dx%d, %d bytes\n",
-      fb->width,
-      fb->height,
-      fb->len
-    );
-
-    String imageBase64 = base64::encode(fb->buf, fb->len);
-    esp_camera_fb_return(fb);
 
 
     if (WiFi.status() == WL_CONNECTED) {
@@ -52,12 +22,11 @@ void httpTask(void* pvParameters) {
       // client.setInsecure();
       HTTPClient http;
 
-      
-
       http.begin(
         client,
-        "http://192.168.1.30:8080/askGemini"
+        "http://192.168.137.1:8080/askGemini"
       );
+      http.setTimeout(120000);
 
     // switch(model) {
     //   case AIModel::GEMINI: 
@@ -75,43 +44,66 @@ void httpTask(void* pvParameters) {
     //   default: break;
     // }
 
-
       http.addHeader(
         "Content-Type",
         "application/json"
       );
-
-
-
+      
       String body = R"({
-        "contents": [
-          {
-            "text": "测试: 1.能否看得到那段日语写的回答要求? 2.能否看到图片? 分析一下图片。",
-            "image": ")" + imageBase64 + R"("
-          }
-        ]
+        "text": "暂时不把图片装入json, 防止消耗太多token。测试语音tts和扬声器功能, 随便为tts模型说点话。",
+        "image": ")" + imageBase64 + R"("
       })";
-
-
 
       notifyToLed(HTTP_WAITING);
       int httpCode = http.POST(body);
-      // int httpCode = http.GET();
-  
 
+  
       if (httpCode > 0) {
         if (httpCode == 200) {
           notifyToLed(HTTP_SUCCESS);
         } else {
           notifyToLed(HTTP_WARNING);
         }
-          Serial.printf("HTTPS Code: %d\n", httpCode);
 
-          String response = http.getString();
+        Serial.printf("HTTPS Code: %d\n", httpCode);
+        String response = http.getString();
+        // Serial.println(response);
 
-          Serial.println(response);
+        // ここから最後までbug修正
+        // ptrを使った関数のデータ型を直す
+        char *audioBase64 = nullptr;
+        if (process(response, &audioBase64) != 0) {
+          safeFree((void**)&audioBase64);
+        }
 
-      } else {
+
+        // JsonDocument doc;
+        // DeserializationError error = deserializeJson(doc, response); 
+        
+        // if (error) {
+        //   Serial.print("JSON parse failed: ");
+        //   Serial.println(error.c_str());
+        // }
+
+        // size_t length = strlen(doc["data"]);
+
+        // char *audioBase64 = (char *)ps_malloc(length + 1);
+        // if (audioBase64 == nullptr) {
+        //   Serial.println("PSRAM allocation failed");
+        // }
+        // strcpy(audioBase64, doc["data"]);
+        // Serial.println("Processing Over");
+
+        
+        if (base64ToPcm(audioBase64, &pcmData) == -1) {
+          safeFree((void**)&audioBase64);
+          safeFree((void**)&pcmData);
+        }
+        safeFree((void**)&audioBase64);
+
+        xTaskNotifyGive(playerTaskHandle);
+      } 
+      else {
         notifyToLed(HTTP_FAILED);
         Serial.printf("Failed: %s\n", http.errorToString(httpCode).c_str());
       }
@@ -121,6 +113,75 @@ void httpTask(void* pvParameters) {
   }
 }
 
+
+
+// JSONから音声データを切り出す
+int process(String response, char **audioBase64) {
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, response);
+  if (error) {
+    Serial.print("JSON parse failed: ");
+    Serial.println(error.c_str());
+    return -1;
+  }
+  
+  const char *data = doc["data"];
+  if (data == nullptr) {
+    Serial.println("data failed");
+    return -1;
+  }
+
+  size_t length = strlen(data);
+
+  *audioBase64 = (char *)ps_malloc(length + 1);
+  if (*audioBase64 == nullptr) {
+    Serial.println("PSRAM allocation failed");
+    return -1;
+  }
+
+  strcpy(*audioBase64, data);
+
+  Serial.println("Processing Over");
+
+  return 0;
+}
+
+
+int base64ToPcm(char *audioBase64, char **pcmData) {
+  size_t base64Length = strlen(audioBase64);
+  size_t pcmLength = (base64Length / 4) * 3 + 3;
+  *pcmData = (char*)ps_malloc(pcmLength);
+  if (*pcmData == nullptr) {
+    Serial.println("PSRAM allocation failed");
+    return -1;
+  }
+
+  int result = mbedtls_base64_decode(
+    (unsigned char *)*pcmData,
+    pcmLength,
+    &decodedLength,
+    (const unsigned char*)audioBase64,
+    base64Length
+  );
+  if (result != 0) {
+    Serial.printf("Base64 decode failed: %d\n", result);
+    free(*pcmData);
+    return -1;
+  }
+
+  Serial.printf(
+    "Base64 length: %u bytes\n",
+    base64Length
+  );
+  Serial.printf(
+    "PCM length: %u bytes\n",
+    decodedLength
+  );
+
+  return decodedLength;
+}
+
+
 void notifyToLed(uint32_t status) {
   xTaskNotify(
     ledTaskHandle,
@@ -128,7 +189,3 @@ void notifyToLed(uint32_t status) {
     eSetValueWithOverwrite
   );
 }
-
-// const AIConfig& getAIConfig(AIModel model) {
-//   return aiConfig[static_cast<int>(model)];
-// }

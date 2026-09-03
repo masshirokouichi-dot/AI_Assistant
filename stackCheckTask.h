@@ -2,6 +2,7 @@
 #define STACK_CHECK_TASK_H
 
 #include <Arduino.h>
+#include <esp_heap_caps.h>
 
 void IRAM_ATTR stackCheckButton();
 void stackCheckTask(void* pvParameters);
