@@ -21,6 +21,7 @@ constexpr int RGBLedPin = 48;
 constexpr int BCLK = 21;
 constexpr int LRC = 14;
 constexpr int DIN = 38;
+constexpr int playerButtonPin = 45;
 
 
 #endif

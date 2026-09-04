@@ -37,6 +37,11 @@ void stackCheckTask(void* pvParameters) {
       "httpTask stack left: %u\n", 
       uxTaskGetStackHighWaterMark(httpTaskHandle)
     );
+    Serial.printf(
+      "playerTask stack left: %u\n", 
+      uxTaskGetStackHighWaterMark(playerTaskHandle)
+    );
+
 
     Serial.printf(
         "PSRAM total: %u\n",
@@ -50,7 +55,8 @@ void stackCheckTask(void* pvParameters) {
         "PSRAM minimum free: %u\n",
         heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM)
     );
-
+    Serial.printf("Free heap size: %u\n", ESP.getHeapSize());
+    Serial.printf("Free min size: %u\n", ESP.getMinFreeHeap());
     Serial.printf("Free heap: %u\n", ESP.getFreeHeap());
     Serial.printf("Free PSRAM: %u\n", ESP.getFreePsram());
     Serial.printf(

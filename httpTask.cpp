@@ -59,9 +59,7 @@ void httpTask(void* pvParameters) {
 
   
       if (httpCode > 0) {
-        if (httpCode == 200) {
-          notifyToLed(HTTP_SUCCESS);
-        } else {
+        if (httpCode != 200) {
           notifyToLed(HTTP_WARNING);
         }
 
@@ -69,39 +67,28 @@ void httpTask(void* pvParameters) {
         String response = http.getString();
         // Serial.println(response);
 
-        // ここから最後までbug修正
-        // ptrを使った関数のデータ型を直す
-        char *audioBase64 = nullptr;
-        if (process(&response, &audioBase64) != 0) {
-          safeFree((void**)&audioBase64);
-          continue;
-        }
-
-
-        // JsonDocument doc;
-        // DeserializationError error = deserializeJson(doc, response); 
-        
-        // if (error) {
-        //   Serial.print("JSON parse failed: ");
-        //   Serial.println(error.c_str());
+        // char *audioBase64 = nullptr; // Do not free
+        // if (process(&response, &audioBase64) != 0) {
+        //   safeFree((void**)&audioBase64);
+        //   continue;
         // }
 
-        // size_t length = strlen(doc["data"]);
+        char *audioBase64 = (char *)response.c_str();
+        audioBase64 += 9;
+        char *end = audioBase64;
+        while (*end != '"') 
+          end++;
+        *end = '\0';
+        // Serial.printf("audioBase64: %s\n", audioBase64);
 
-        // char *audioBase64 = (char *)ps_malloc(length + 1);
-        // if (audioBase64 == nullptr) {
-        //   Serial.println("PSRAM allocation failed");
-        // }
-        // strcpy(audioBase64, doc["data"]);
-        // Serial.println("Processing Over");
 
         int result = base64ToPcm(audioBase64, &pcmData);
-        safeFree((void**)&audioBase64);
         if (result == -1) {
           safeFree((void**)&pcmData);
           continue;
         }
-
+        
+        notifyToLed(HTTP_SUCCESS);
         xTaskNotifyGive(playerTaskHandle);
       } 
       else {
@@ -109,47 +96,13 @@ void httpTask(void* pvParameters) {
         Serial.printf("Failed: %s\n", http.errorToString(httpCode).c_str());
       }
 
-      Serial.println("HttpTask Over");
       http.end();
     }
   }
 }
 
 
-
-// JSONから音声データを切り出す
-int process(String *response, char **audioBase64) {
-  Serial.print("response length = ");
-  Serial.println(response->length());
-  JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, *response);
-  if (error) {
-    Serial.print("JSON parse failed: ");
-    Serial.println(error.c_str());
-    return -1;
-  }
-  
-  const char *data = doc["data"];
-  if (data == nullptr) {
-    Serial.println("data failed");
-    return -1;
-  }
-
-  size_t length = strlen(data);
-
-  *audioBase64 = (char *)ps_malloc(length + 1);
-  if (*audioBase64 == nullptr) {
-    Serial.println("PSRAM allocation failed");
-    return -1;
-  }
-
-  strcpy(*audioBase64, data);
-
-  return 0;
-}
-
-
-int base64ToPcm(char *audioBase64, char **pcmData) {
+int base64ToPcm(const char *audioBase64, char **pcmData) {
   size_t base64Length = strlen(audioBase64);
   size_t pcmLength = (base64Length / 4) * 3 + 3;
   *pcmData = (char*)ps_malloc(pcmLength);
@@ -182,6 +135,42 @@ int base64ToPcm(char *audioBase64, char **pcmData) {
   return decodedLength;
 }
 
+
+// 未完成　今のところには使う必要がない
+// JSONから音声データを切り出す
+int process(String *response, char **audioBase64) {
+  Serial.print("response length = ");
+  Serial.println(response->length());
+  // BasicJsonDocument<SpiRamAllocator> doc;
+  // DeserializationError error = deserializeJson(doc, *response);
+  // if (error) {
+  //   Serial.print("JSON parse failed: ");
+  //   Serial.println(error.c_str());
+  //   return -1;
+  // }
+
+  *audioBase64 = strstr(response->c_str(), "\"data\"");
+  *audioBase64 += 9;
+
+  
+  // const char *data = doc["data"];
+  // if (data == nullptr) {
+  //   Serial.println("data failed");
+  //   return -1;
+  // }
+
+  // size_t length = strlen(data);
+
+  // *audioBase64 = (char *)ps_malloc(length + 1);
+  // if (*audioBase64 == nullptr) {
+  //   Serial.println("PSRAM allocation failed");
+  //   return -1;
+  // }
+
+  // strcpy(*audioBase64, data);
+
+  return 0;
+}
 
 void notifyToLed(uint32_t status) {
   xTaskNotify(

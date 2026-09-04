@@ -19,10 +19,11 @@ void setup() {
 
   pinMode(ledButtonPin, INPUT_PULLUP);
   pinMode(stackCheckButtonPin, INPUT_PULLUP);
+  pinMode(playerButtonPin, INPUT_PULLUP);
 
   attachInterrupt(ledButtonPin, ledButton, FALLING);
   attachInterrupt(stackCheckButtonPin, stackCheckButton, FALLING);
-
+  attachInterrupt(playerButtonPin, playerButton, FALLING);
 
   xTaskCreatePinnedToCore(
     stackCheckTask,
@@ -57,7 +58,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     httpTask,
     "HttpTask",
-    6144,
+    4096,
     NULL,
     2,
     &httpTaskHandle,

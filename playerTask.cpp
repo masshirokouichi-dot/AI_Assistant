@@ -22,7 +22,26 @@ void playerInit() {
   Serial.println("I2S started");
 }
 
-//グローバル変数に保存されている音声を再生する
+void IRAM_ATTR playerButton() {
+  unsigned long currentTime = millis();
+
+  if (currentTime - lastInterruptTime > 100) {
+    BaseType_t higherPriorityTaskWoken = pdFALSE;
+
+    vTaskNotifyGiveFromISR(
+      playerTaskHandle,
+      &higherPriorityTaskWoken
+    );
+
+    portYIELD_FROM_ISR(higherPriorityTaskWoken);
+  }
+
+  lastInterruptTime = currentTime;
+}
+
+
+
+//グローバルptr変数に保存されているアドレスの音声を再生する
 void playerTask(void* pvParameters){
   while (1)  {
     ulTaskNotifyTake(
@@ -35,7 +54,7 @@ void playerTask(void* pvParameters){
         CHUNK_SIZE,
         decodedLength - offset
       );
-
+      
       // ボリュームを下げる
       int16_t *samples = (int16_t *)(pcmData + offset);
       for (size_t i = 0; i < length / 2; i++) {
@@ -52,6 +71,6 @@ void playerTask(void* pvParameters){
         continue;
       }
     }
-    safeFree((void**)&pcmData);
+    // safeFree((void**)&pcmData);
   }
 }
