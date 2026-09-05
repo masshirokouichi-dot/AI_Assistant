@@ -3,6 +3,23 @@
 #include "camera.h"
 #include "httpTask.h"
 
+void IRAM_ATTR httpButton() {
+  unsigned long currentTime = millis();
+
+  if (currentTime - lastInterruptTime > 100) {
+    BaseType_t higherPriorityTaskWoken = pdFALSE;
+
+    vTaskNotifyGiveFromISR(
+      httpTaskHandle,
+      &higherPriorityTaskWoken
+    );
+
+    portYIELD_FROM_ISR(higherPriorityTaskWoken);
+  }
+
+  lastInterruptTime = currentTime;
+}
+
 
 void httpTask(void* pvParameters) {
   while (1) {

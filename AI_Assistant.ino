@@ -4,7 +4,6 @@
 #include "global.h"
 #include "httpTask.h"
 #include "stackCheckTask.h"
-#include "ledButton.h"
 #include "camera.h"
 #include "playerTask.h"
 
@@ -17,11 +16,11 @@ void setup() {
   cameraInit();
   playerInit();
 
-  pinMode(ledButtonPin, INPUT_PULLUP);
+  pinMode(httpButtonPin, INPUT_PULLUP);
   pinMode(stackCheckButtonPin, INPUT_PULLUP);
   pinMode(playerButtonPin, INPUT_PULLUP);
 
-  attachInterrupt(ledButtonPin, ledButton, FALLING);
+  attachInterrupt(httpButtonPin, httpButton, FALLING);
   attachInterrupt(stackCheckButtonPin, stackCheckButton, FALLING);
   attachInterrupt(playerButtonPin, playerButton, FALLING);
 
@@ -58,7 +57,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     httpTask,
     "HttpTask",
-    4096,
+    5120,
     NULL,
     2,
     &httpTaskHandle,
@@ -68,7 +67,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     playerTask,
     "PlayerTask",
-    4096,
+    7168,
     NULL,
     2,
     &playerTaskHandle,

@@ -49,28 +49,28 @@ void playerTask(void* pvParameters){
       portMAX_DELAY
     );
 
+    char temp[CHUNK_SIZE];
     for (size_t offset = 0; offset < decodedLength; offset += CHUNK_SIZE) {
       size_t length = min(
         CHUNK_SIZE,
         decodedLength - offset
       );
-      
+
+
       // ボリュームを下げる
-      int16_t *samples = (int16_t *)(pcmData + offset);
+      memcpy(temp, pcmData + offset, length);
+
+      int16_t *samples = (int16_t *)temp;
       for (size_t i = 0; i < length / 2; i++) {
           samples[i] *= volume;
       }
 
-      size_t written = I2S.write(
-        pcmData + offset,
-        length
-      );
+      size_t written = I2S.write(temp, length);
 
       if (written == 0) {
         Serial.println("I2S write failed");
         continue;
       }
     }
-    // safeFree((void**)&pcmData);
   }
 }

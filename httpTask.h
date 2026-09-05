@@ -10,6 +10,8 @@
 #include <ArduinoJson.h>
 #include "mbedtls/base64.h"
 
+void IRAM_ATTR httpButton();
+
 void httpTask(void* pvParameters);
 
 void notifyToLed(uint32_t status);
