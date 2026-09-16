@@ -90,13 +90,32 @@ void httpTask(void* pvParameters) {
         //   continue;
         // }
 
+
         char *audioBase64 = (char *)response.c_str();
+
+
+        Serial.println("First 50 chars:");
+        for (int i = 0; i < 50; i++) {
+            Serial.print(audioBase64[i]);
+        }
+        Serial.println();
+
+        
         audioBase64 += 9;
         char *end = audioBase64;
         while (*end != '"') 
           end++;
         *end = '\0';
         // Serial.printf("audioBase64: %s\n", audioBase64);
+
+
+        Serial.println("Base64 first 50 chars:");
+        for (int i = 0; i < 50; i++) {
+            Serial.print(audioBase64[i]);
+        }
+        Serial.println();
+
+
 
 
         int result = base64ToPcm(audioBase64, &pcmData);

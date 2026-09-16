@@ -13,15 +13,16 @@ constexpr char* password = "s1frs03 6988";
 
 // constexpr AIModel model = AIModel::PC;
 
-constexpr float volume = 0.05f;
 
-constexpr int stackCheckButtonPin = 1;
+
+constexpr int stackCheckButtonPin = 45;
 constexpr int httpButtonPin = 2;
 constexpr int RGBLedPin = 48;
-constexpr int BCLK = 21;
+constexpr int BCLK = 38;
 constexpr int LRC = 14;
-constexpr int DIN = 38;
-constexpr int playerButtonPin = 45;
+constexpr int DIN = 21;
+constexpr int playerButtonPin = 47;
+constexpr int volumePin = 1;
 
 
 #endif

@@ -4,6 +4,8 @@
 const int SAMPLE_RATE = 24000;
 const size_t CHUNK_SIZE = 4096;
 
+float volume = 0.05f;
+
 I2SClass I2S;
 
 
@@ -59,6 +61,7 @@ void playerTask(void* pvParameters){
 
       // ボリュームを下げる
       memcpy(temp, pcmData + offset, length);
+      volume = analogRead(volumePin) / 4095.0f;
 
       int16_t *samples = (int16_t *)temp;
       for (size_t i = 0; i < length / 2; i++) {
