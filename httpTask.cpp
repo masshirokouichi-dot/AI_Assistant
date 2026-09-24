@@ -93,14 +93,12 @@ void httpTask(void* pvParameters) {
 
         char *audioBase64 = (char *)response.c_str();
 
+        // Serial.println("First 50 chars:");
+        // for (int i = 0; i < 50; i++) {
+        //     Serial.print(audioBase64[i]);
+        // }
+        // Serial.println();
 
-        Serial.println("First 50 chars:");
-        for (int i = 0; i < 50; i++) {
-            Serial.print(audioBase64[i]);
-        }
-        Serial.println();
-
-        
         audioBase64 += 9;
         char *end = audioBase64;
         while (*end != '"') 
@@ -109,11 +107,11 @@ void httpTask(void* pvParameters) {
         // Serial.printf("audioBase64: %s\n", audioBase64);
 
 
-        Serial.println("Base64 first 50 chars:");
-        for (int i = 0; i < 50; i++) {
-            Serial.print(audioBase64[i]);
-        }
-        Serial.println();
+        // Serial.println("Base64 first 50 chars:");
+        // for (int i = 0; i < 50; i++) {
+        //     Serial.print(audioBase64[i]);
+        // }
+        // Serial.println();
 
 
 

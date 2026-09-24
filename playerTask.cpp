@@ -61,7 +61,7 @@ void playerTask(void* pvParameters){
 
       // ボリュームを下げる
       memcpy(temp, pcmData + offset, length);
-      volume = analogRead(volumePin) / 4095.0f;
+      volume = getVolume();
 
       int16_t *samples = (int16_t *)temp;
       for (size_t i = 0; i < length / 2; i++) {
@@ -76,4 +76,19 @@ void playerTask(void* pvParameters){
       }
     }
   }
+}
+
+
+
+float getVolume(){
+    int adcValue = analogRead(volumePin);
+
+    // 0.0 ～ 1.0
+    float knob = adcValue / 4095.0f;
+
+    // -60 dB ～ 0 dB
+    float db = -60.0f * (1.0f - knob);
+
+    // dB → 振幅倍率
+    return powf(10.0f, db / 20.0f);
 }
