@@ -6,7 +6,7 @@ const size_t CHUNK_SIZE = 4096;
 
 float volume = 0.05f;
 
-I2SClass I2S;
+I2SClass I2S(I2S_NUM_0);
 
 
 void playerInit() {
@@ -20,14 +20,15 @@ void playerInit() {
   )) {
     Serial.println("I2S init failed");
   }
-
-  Serial.println("I2S started");
+  else {
+    Serial.println("I2S started");
+  }
 }
 
 void IRAM_ATTR playerButton() {
   unsigned long currentTime = millis();
 
-  if (currentTime - lastInterruptTime > 100) {
+  if (currentTime - lastInterruptTime > debounceInterval) {
     BaseType_t higherPriorityTaskWoken = pdFALSE;
 
     vTaskNotifyGiveFromISR(
@@ -50,12 +51,23 @@ void playerTask(void* pvParameters){
       pdTRUE,
       portMAX_DELAY
     );
+    bool accepted = false;
+    portENTER_CRITICAL(&audioStateMux);
+    if (audioState == AudioState::PLAYING || audioState == AudioState::IDLE) {
+      audioState = AudioState::PLAYING;
+      accepted = true;
+    }
+    portEXIT_CRITICAL(&audioStateMux);
+    if (!accepted) {
+      continue;
+    }
+    Serial.println("再生");
 
     char temp[CHUNK_SIZE];
-    for (size_t offset = 0; offset < decodedLength; offset += CHUNK_SIZE) {
+    for (size_t offset = 0; offset < pcmDataLength ; offset += CHUNK_SIZE) {
       size_t length = min(
         CHUNK_SIZE,
-        decodedLength - offset
+        pcmDataLength  - offset
       );
 
 
@@ -75,6 +87,10 @@ void playerTask(void* pvParameters){
         continue;
       }
     }
+    Serial.println("再生終了");
+    portENTER_CRITICAL(&audioStateMux);
+    audioState = AudioState::IDLE;
+    portEXIT_CRITICAL(&audioStateMux);
   }
 }
 

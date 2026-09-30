@@ -4,7 +4,7 @@
 void IRAM_ATTR stackCheckButton() {
   unsigned long currentTime = millis();
 
-  if (currentTime - lastInterruptTime > 100) {
+  if (currentTime - lastInterruptTime > debounceInterval) {
     BaseType_t higherPriorityTaskWoken = pdFALSE;
 
     vTaskNotifyGiveFromISR(

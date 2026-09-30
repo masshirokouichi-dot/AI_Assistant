@@ -16,11 +16,11 @@ void setup() {
   cameraInit();
   playerInit();
 
-  pinMode(httpButtonPin, INPUT_PULLUP);
+  pinMode(startButtonPin, INPUT_PULLUP);
   pinMode(stackCheckButtonPin, INPUT_PULLUP);
   pinMode(playerButtonPin, INPUT_PULLUP);
 
-  attachInterrupt(httpButtonPin, httpButton, FALLING);
+  attachInterrupt(startButtonPin, startButton, FALLING);
   attachInterrupt(stackCheckButtonPin, stackCheckButton, FALLING);
   attachInterrupt(playerButtonPin, playerButton, FALLING);
 

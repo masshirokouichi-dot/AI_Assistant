@@ -3,10 +3,10 @@
 #include "camera.h"
 #include "httpTask.h"
 
-void IRAM_ATTR httpButton() {
+void IRAM_ATTR startButton() {
   unsigned long currentTime = millis();
 
-  if (currentTime - lastInterruptTime > 100) {
+  if (currentTime - lastInterruptTime > debounceInterval) {
     BaseType_t higherPriorityTaskWoken = pdFALSE;
 
     vTaskNotifyGiveFromISR(
@@ -27,10 +27,21 @@ void httpTask(void* pvParameters) {
       pdTRUE,
       portMAX_DELAY
     );
+    bool accepted = false;
+    portENTER_CRITICAL(&audioStateMux);
+    if (audioState == AudioState::IDLE) {
+      audioState = AudioState::HTTP;
+      accepted = true;
+    }
+    portEXIT_CRITICAL(&audioStateMux);
+    if (!accepted) {
+      continue;
+    }
   
     String imageBase64;
     if (cameraTake(&imageBase64) != 0) {
-      notifyToLed(HTTP_FAILED);
+      error();
+      continue;
     }
 
 
@@ -77,50 +88,90 @@ void httpTask(void* pvParameters) {
   
       if (httpCode > 0) {
         if (httpCode != 200) {
-          notifyToLed(HTTP_WARNING);
+          http.end();
+          error();
+          continue;
         }
 
         Serial.printf("HTTPS Code: %d\n", httpCode);
-        String response = http.getString();
+        // String response = http.getString();
         // Serial.println(response);
-
-        // char *audioBase64 = nullptr; // Do not free
-        // if (process(&response, &audioBase64) != 0) {
-        //   safeFree((void**)&audioBase64);
+        // char *audioBase64 = (char *)response.c_str();
+        // audioBase64 += 9;
+        // char *end = audioBase64;
+        // while (*end != '"') 
+        //   end++;
+        // *end = '\0';
+        // int result = base64ToPcm(audioBase64, &pcmData);
+        // if (result == -1) {
+        //   safeFree((void**)&pcmData);
         //   continue;
         // }
 
+        int contentLength = http.getSize();
 
-        char *audioBase64 = (char *)response.c_str();
-
-        // Serial.println("First 50 chars:");
-        // for (int i = 0; i < 50; i++) {
-        //     Serial.print(audioBase64[i]);
-        // }
-        // Serial.println();
-
-        audioBase64 += 9;
-        char *end = audioBase64;
-        while (*end != '"') 
-          end++;
-        *end = '\0';
-        // Serial.printf("audioBase64: %s\n", audioBase64);
-
-
-        // Serial.println("Base64 first 50 chars:");
-        // for (int i = 0; i < 50; i++) {
-        //     Serial.print(audioBase64[i]);
-        // }
-        // Serial.println();
-
-
-
-
-        int result = base64ToPcm(audioBase64, &pcmData);
-        if (result == -1) {
-          safeFree((void**)&pcmData);
+        if (contentLength <= 0) {
+          Serial.println("Invalid audio Content-Length");
+          error();
+          http.end();
           continue;
         }
+        safeFree((void**)&pcmData);
+        pcmData = (char*)ps_malloc((size_t)contentLength);
+
+        if (pcmData == nullptr) {
+          Serial.printf("PSRAM allocation failed: %d bytes\n", contentLength);
+
+          notifyToLed(HTTP_FAILED);
+          http.end();
+
+          portENTER_CRITICAL(&audioStateMux);
+          audioState = AudioState::IDLE;
+          portEXIT_CRITICAL(&audioStateMux);
+
+          continue;
+        }
+
+
+        WiFiClient *stream = http.getStreamPtr();
+        size_t totalRead = 0;
+        unsigned long lastDataTime = millis();
+
+        while (totalRead < (size_t)contentLength) {
+          size_t availableBytes = stream->available();
+
+          if (availableBytes > 0) {
+            size_t remaining = (size_t)contentLength - totalRead;
+            size_t readSize = min(availableBytes, remaining);
+
+            int bytesRead = stream->readBytes(
+              (uint8_t*)pcmData + totalRead,
+              readSize
+            );
+
+            if (bytesRead > 0) {
+              totalRead += (size_t)bytesRead;
+              lastDataTime = millis();
+            }
+          }
+          else {
+            // 服务器断开且已经没有数据
+            if (!stream->connected()) {
+              break;
+            }
+
+            // 防止网络异常时永久卡住
+            if (millis() - lastDataTime > 10000) {
+              Serial.println("Audio receive timeout");
+              break;
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(1));
+          }
+        }
+
+
+
         
         notifyToLed(HTTP_SUCCESS);
         xTaskNotifyGive(playerTaskHandle);
@@ -133,6 +184,13 @@ void httpTask(void* pvParameters) {
       http.end();
     }
   }
+}
+
+void error() {
+  notifyToLed(HTTP_FAILED);
+  portENTER_CRITICAL(&audioStateMux);
+  audioState = AudioState::IDLE;
+  portEXIT_CRITICAL(&audioStateMux);
 }
 
 
@@ -148,7 +206,7 @@ int base64ToPcm(const char *audioBase64, char **pcmData) {
   int result = mbedtls_base64_decode(
     (unsigned char *)*pcmData,
     pcmLength,
-    &decodedLength,
+    &pcmDataLength,
     (const unsigned char*)audioBase64,
     base64Length
   );
@@ -163,10 +221,10 @@ int base64ToPcm(const char *audioBase64, char **pcmData) {
   );
   Serial.printf(
     "PCM length: %u bytes\n",
-    decodedLength
+    pcmDataLength
   );
 
-  return decodedLength;
+  return pcmDataLength;
 }
 
 

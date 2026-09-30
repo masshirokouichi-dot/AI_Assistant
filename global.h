@@ -12,7 +12,7 @@ extern TaskHandle_t playerTaskHandle;
 extern volatile unsigned long lastInterruptTime;
 
 extern char *pcmData;
-extern size_t decodedLength;
+extern size_t pcmDataLength;
 
 
 extern void safeFree(void **ptr);
@@ -23,6 +23,14 @@ enum HttpStatus: uint32_t{
   HTTP_WARNING = 2,
   HTTP_FAILED = 3
 };
+enum class AudioState : uint8_t {
+  IDLE,
+  HTTP,
+  RECORDING,
+  PLAYING
+};
+extern AudioState audioState;
+extern portMUX_TYPE audioStateMux;
 #endif
 
 // enum class AIModel {
