@@ -5,20 +5,20 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WifiClientSecure.h>
-#include <esp_camera.h>
 #include <base64.h>
-#include <ArduinoJson.h>
+#include <esp_camera.h>
 #include "mbedtls/base64.h"
 
-void IRAM_ATTR startButton();
+void startButton();
 
 void httpTask(void* pvParameters);
 
 void error();
 void notifyToLed(uint32_t status);
-int process(String *response, char **audioBase64);
+// int process(String *response, char **audioBase64);
 int base64ToPcm(const char *audioBase64, char **pcmData);
-void safeFree(void **ptr);
+
+// void safeFree(void **ptr);
 // const AIConfig& getAIConfig(AIModel Model);
 
 #endif 

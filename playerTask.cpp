@@ -6,7 +6,7 @@ const size_t CHUNK_SIZE = 4096;
 
 float volume = 0.05f;
 
-I2SClass I2S(I2S_NUM_0);
+I2SClass I2S(I2S_NUM_1);
 
 
 void playerInit() {

@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <esp_heap_caps.h>
 
-void IRAM_ATTR stackCheckButton();
+void stackCheckButton();
 void stackCheckTask(void* pvParameters);
 
 #endif

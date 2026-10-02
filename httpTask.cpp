@@ -38,12 +38,18 @@ void httpTask(void* pvParameters) {
       continue;
     }
   
-    String imageBase64;
-    if (cameraTake(&imageBase64) != 0) {
+    camera_fb_t *image = esp_camera_fb_get();
+    if (image == nullptr) {
+      Serial.println("Camera capture failed");
       error();
       continue;
     }
-
+    Serial.printf(
+      "Photo: %dx%d, %d bytes\n",
+      image->width,
+      image->height,
+      image->len
+    );
 
     if (WiFi.status() == WL_CONNECTED) {
       WiFiClient client;
@@ -54,7 +60,7 @@ void httpTask(void* pvParameters) {
         client,
         "http://192.168.137.1:8080/askGemini"
       );
-      http.setTimeout(120000);
+      http.setTimeout(60000);
 
     // switch(model) {
     //   case AIModel::GEMINI: 
@@ -72,43 +78,22 @@ void httpTask(void* pvParameters) {
     //   default: break;
     // }
 
-      http.addHeader(
-        "Content-Type",
-        "application/json"
-      );
+      http.addHeader("Content-Type", "image/jpeg");
       
-      String body = R"({
-        "text": "暂时不把图片装入json, 防止消耗太多token。测试语音tts和扬声器功能, 随便为tts模型说点话。",
-        "image": ")" + imageBase64 + R"("
-      })";
+      // String body = R"({
+      //   "text": "暂时不把图片装入json, 防止消耗太多token。测试语音tts和扬声器功能, 随便为tts模型说点话。",
+      //   "image": ")" + imageBase64 + R"("
+      // })";
 
       notifyToLed(HTTP_WAITING);
-      int httpCode = http.POST(body);
+      int httpCode = http.POST(image->buf, image->len);
 
+      esp_camera_fb_return(image);
+      image = nullptr;
   
-      if (httpCode > 0) {
-        if (httpCode != 200) {
-          http.end();
-          error();
-          continue;
-        }
-
+      if (httpCode == 200) {
         Serial.printf("HTTPS Code: %d\n", httpCode);
-        // String response = http.getString();
-        // Serial.println(response);
-        // char *audioBase64 = (char *)response.c_str();
-        // audioBase64 += 9;
-        // char *end = audioBase64;
-        // while (*end != '"') 
-        //   end++;
-        // *end = '\0';
-        // int result = base64ToPcm(audioBase64, &pcmData);
-        // if (result == -1) {
-        //   safeFree((void**)&pcmData);
-        //   continue;
-        // }
-
-        int contentLength = http.getSize();
+        size_t contentLength = (size_t)http.getSize();
 
         if (contentLength <= 0) {
           Serial.println("Invalid audio Content-Length");
@@ -117,12 +102,12 @@ void httpTask(void* pvParameters) {
           continue;
         }
         safeFree((void**)&pcmData);
-        pcmData = (char*)ps_malloc((size_t)contentLength);
+        pcmData = (char*)ps_malloc(contentLength);
 
         if (pcmData == nullptr) {
           Serial.printf("PSRAM allocation failed: %d bytes\n", contentLength);
 
-          notifyToLed(HTTP_FAILED);
+          error();
           http.end();
 
           portENTER_CRITICAL(&audioStateMux);
@@ -137,11 +122,11 @@ void httpTask(void* pvParameters) {
         size_t totalRead = 0;
         unsigned long lastDataTime = millis();
 
-        while (totalRead < (size_t)contentLength) {
+        while (totalRead < contentLength) {
           size_t availableBytes = stream->available();
 
           if (availableBytes > 0) {
-            size_t remaining = (size_t)contentLength - totalRead;
+            size_t remaining = contentLength - totalRead;
             size_t readSize = min(availableBytes, remaining);
 
             int bytesRead = stream->readBytes(
@@ -170,10 +155,31 @@ void httpTask(void* pvParameters) {
           }
         }
 
+        if (totalRead != contentLength) {
+          Serial.printf(
+            "Incomplete audio: received %u / %d bytes\n",
+            (unsigned int)totalRead,
+            contentLength
+          );
 
+          safeFree((void**)&pcmData);
+          pcmDataLength = 0;
+          http.end();
+          error();
+          continue;
+        }
 
+        pcmDataLength = totalRead;
+
+        Serial.printf(
+          "PCM received: %u bytes\n",
+          (unsigned int)pcmDataLength
+        );
         
         notifyToLed(HTTP_SUCCESS);
+        portENTER_CRITICAL(&audioStateMux);
+        audioState = AudioState::PLAYING;
+        portEXIT_CRITICAL(&audioStateMux);
         xTaskNotifyGive(playerTaskHandle);
       } 
       else {
@@ -193,76 +199,6 @@ void error() {
   portEXIT_CRITICAL(&audioStateMux);
 }
 
-
-int base64ToPcm(const char *audioBase64, char **pcmData) {
-  size_t base64Length = strlen(audioBase64);
-  size_t pcmLength = (base64Length / 4) * 3 + 3;
-  *pcmData = (char*)ps_malloc(pcmLength);
-  if (*pcmData == nullptr) {
-    Serial.println("PSRAM allocation failed");
-    return -1;
-  }
-
-  int result = mbedtls_base64_decode(
-    (unsigned char *)*pcmData,
-    pcmLength,
-    &pcmDataLength,
-    (const unsigned char*)audioBase64,
-    base64Length
-  );
-  if (result != 0) {
-    Serial.printf("Base64 decode failed: %d\n", result);
-    return -1;
-  }
-
-  Serial.printf(
-    "Base64 length: %u bytes\n",
-    base64Length
-  );
-  Serial.printf(
-    "PCM length: %u bytes\n",
-    pcmDataLength
-  );
-
-  return pcmDataLength;
-}
-
-
-// 未完成　今のところには使う必要がない
-// JSONから音声データを切り出す
-int process(String *response, char **audioBase64) {
-  Serial.print("response length = ");
-  Serial.println(response->length());
-  // BasicJsonDocument<SpiRamAllocator> doc;
-  // DeserializationError error = deserializeJson(doc, *response);
-  // if (error) {
-  //   Serial.print("JSON parse failed: ");
-  //   Serial.println(error.c_str());
-  //   return -1;
-  // }
-
-  *audioBase64 = strstr(response->c_str(), "\"data\"");
-  *audioBase64 += 9;
-
-  
-  // const char *data = doc["data"];
-  // if (data == nullptr) {
-  //   Serial.println("data failed");
-  //   return -1;
-  // }
-
-  // size_t length = strlen(data);
-
-  // *audioBase64 = (char *)ps_malloc(length + 1);
-  // if (*audioBase64 == nullptr) {
-  //   Serial.println("PSRAM allocation failed");
-  //   return -1;
-  // }
-
-  // strcpy(*audioBase64, data);
-
-  return 0;
-}
 
 void notifyToLed(uint32_t status) {
   xTaskNotify(

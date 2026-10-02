@@ -8,8 +8,10 @@ extern TaskHandle_t wifiTaskHandle;
 extern TaskHandle_t httpTaskHandle;
 extern TaskHandle_t stackCheckHandle;
 extern TaskHandle_t playerTaskHandle;
+extern TaskHandle_t microTaskHandle;
 
 extern volatile unsigned long lastInterruptTime;
+extern const unsigned long debounceInterval;
 
 extern char *pcmData;
 extern size_t pcmDataLength;

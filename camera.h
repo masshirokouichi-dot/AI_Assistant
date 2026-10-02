@@ -6,6 +6,6 @@
 #include <base64.h>
 
 void cameraInit();
-int cameraTake(String *p);
+// int cameraTake(String *p);
 
 #endif

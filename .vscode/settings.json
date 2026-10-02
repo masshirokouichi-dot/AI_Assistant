@@ -1,0 +1,6 @@
+{
+  "files.associations": { "*.ino": "cpp" },
+  "C_Cpp.default.configurationProvider": "",
+  "files.exclude": { ".vscode/arduino-build": true },
+  "search.exclude": { ".vscode/arduino-build/**": true }
+}

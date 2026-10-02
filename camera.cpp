@@ -55,10 +55,28 @@ void cameraInit() {
     );
     return;
   }
-
   Serial.println("Camera init OK");
+} 
 
-}
+// int cameraTake(String *p) {
+//   camera_fb_t *fb = esp_camera_fb_get();
+
+//   if (fb == nullptr) {
+//     Serial.println("Camera capture failed");
+//     return -1;
+//   }
+//   Serial.printf(
+//     "Photo: %dx%d, %d bytes\n",
+//     fb->width,
+//     fb->height,
+//     fb->len
+//   );
+
+//   *p = base64::encode(fb->buf, fb->len);
+//   esp_camera_fb_return(fb);
+  
+//   return 0;
+// }
 
 
 // String cameraTake() {
@@ -83,24 +101,3 @@ void cameraInit() {
 
 
 
- 
-
-int cameraTake(String *p) {
-  camera_fb_t *fb = esp_camera_fb_get();
-
-  if (fb == nullptr) {
-    Serial.println("Camera capture failed");
-    return -1;
-  }
-  Serial.printf(
-    "Photo: %dx%d, %d bytes\n",
-    fb->width,
-    fb->height,
-    fb->len
-  );
-
-  *p = base64::encode(fb->buf, fb->len);
-  esp_camera_fb_return(fb);
-  
-  return 0;
-}

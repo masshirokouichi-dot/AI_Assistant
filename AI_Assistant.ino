@@ -6,8 +6,7 @@
 #include "stackCheckTask.h"
 #include "camera.h"
 #include "playerTask.h"
-
-#include <ArduinoJson.h>
+#include "microTask.h"
 
 
 void setup() {
@@ -23,6 +22,16 @@ void setup() {
   attachInterrupt(startButtonPin, startButton, FALLING);
   attachInterrupt(stackCheckButtonPin, stackCheckButton, FALLING);
   attachInterrupt(playerButtonPin, playerButton, FALLING);
+
+  xTaskCreatePinnedToCore(
+    microTask,
+    "microTask",
+    7168,
+    NULL,
+    2,
+    &microTaskHandle,
+    1
+  );
 
   xTaskCreatePinnedToCore(
     stackCheckTask,
