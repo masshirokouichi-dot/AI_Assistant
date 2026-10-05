@@ -14,6 +14,7 @@ void setup() {
 
   cameraInit();
   playerInit();
+  microInit();
 
   pinMode(startButtonPin, INPUT_PULLUP);
   pinMode(stackCheckButtonPin, INPUT_PULLUP);
@@ -28,7 +29,7 @@ void setup() {
     "microTask",
     7168,
     NULL,
-    2,
+    3,
     &microTaskHandle,
     1
   );
@@ -58,7 +59,7 @@ void setup() {
     "WiFiTask",
     4096,
     NULL,
-    3,
+    4,
     &wifiTaskHandle,
     0
   );

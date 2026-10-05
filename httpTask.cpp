@@ -3,16 +3,26 @@
 #include "camera.h"
 #include "httpTask.h"
 
+
+static bool notifyNext = true;
+
 void IRAM_ATTR startButton() {
   unsigned long currentTime = millis();
 
   if (currentTime - lastInterruptTime > debounceInterval) {
     BaseType_t higherPriorityTaskWoken = pdFALSE;
 
+    TaskHandle_t target = notifyNext
+      ? httpTaskHandle
+      : microTaskHandle;
+
     vTaskNotifyGiveFromISR(
-      httpTaskHandle,
+      target,
       &higherPriorityTaskWoken
     );
+
+    notifyNext = !notifyNext;
+
 
     portYIELD_FROM_ISR(higherPriorityTaskWoken);
   }
@@ -50,6 +60,9 @@ void httpTask(void* pvParameters) {
       image->height,
       image->len
     );
+    
+    xTaskNotifyGive(microTaskHandle);
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
     if (WiFi.status() == WL_CONNECTED) {
       WiFiClient client;
@@ -62,32 +75,52 @@ void httpTask(void* pvParameters) {
       );
       http.setTimeout(60000);
 
-    // switch(model) {
-    //   case AIModel::GEMINI: 
-    //     // http.addHeader(
-    //     //   "x-goog-api-key",
-    //     //   getAIConfig(model).apiKey
-    //     // );
-    //     break;
-    //   case AIModel::DEEPSEEK:
-    //     http.addHeader(
-    //       "Authorization",
-    //       String("Bearer ") + getAIConfig(model).apiKey
-    //     );
-    //     break;
-    //   default: break;
-    // }
-
-      http.addHeader("Content-Type", "image/jpeg");
-      
-      // String body = R"({
-      //   "text": "暂时不把图片装入json, 防止消耗太多token。测试语音tts和扬声器功能, 随便为tts模型说点话。",
-      //   "image": ")" + imageBase64 + R"("
-      // })";
-
       notifyToLed(HTTP_WAITING);
-      int httpCode = http.POST(image->buf, image->len);
+      
+      const String boundary = "Esp32Boundary7e43a9";
+      String imageHeader =
+          "--" + boundary + "\r\n"
+          "Content-Disposition: form-data; name=\"image\"; "
+          "filename=\"photo.jpg\"\r\n"
+          "Content-Type: image/jpeg\r\n\r\n";
+      String audioHeader =
+          "\r\n--" + boundary + "\r\n"
+          "Content-Disposition: form-data; name=\"audio\"; "
+          "filename=\"recording.pcm\"\r\n"
+          "Content-Type: application/octet-stream\r\n\r\n";
+      String ending = "\r\n--" + boundary + "--\r\n";
+      size_t length =
+          imageHeader.length() + image->len +
+          audioHeader.length() + pcmDataLength +
+          ending.length();
 
+      uint8_t* body = (uint8_t*)ps_malloc(length);
+      if (!body) {
+        Serial.println("Upload buffer allocation failed");
+        continue;
+      }
+
+      size_t offset = 0;
+      // 将每一段依次复制到请求体中
+      auto append = [&](const void* data, size_t size) {
+          memcpy(body + offset, data, size);
+          offset += size;
+      };
+
+      append(imageHeader.c_str(), imageHeader.length());
+      append(image->buf, image->len);
+      append(audioHeader.c_str(), audioHeader.length());
+      append(pcmData, pcmDataLength);
+      append(ending.c_str(), ending.length());
+
+      http.addHeader(
+          "Content-Type",
+          "multipart/form-data; boundary=" + boundary
+      );
+
+      int httpCode = http.POST(body, length);
+
+      free(body);
       esp_camera_fb_return(image);
       image = nullptr;
   
@@ -183,10 +216,18 @@ void httpTask(void* pvParameters) {
         xTaskNotifyGive(playerTaskHandle);
       } 
       else {
-        notifyToLed(HTTP_FAILED);
-        Serial.printf("Failed: %s\n", http.errorToString(httpCode).c_str());
+        if (httpCode > 0) {
+          Serial.printf("HTTP status: %d\n", httpCode);
+          Serial.println(http.getString());
+        }
+        else {
+          Serial.printf(
+            "Request failed: %s\n",
+            http.errorToString(httpCode).c_str()
+          );
+        }
+        error();
       }
-
       http.end();
     }
   }

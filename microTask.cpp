@@ -33,17 +33,6 @@ void microInit() {
 void microTask(void* pvParameters) {
   while (1) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    bool accepted = false;
-    portENTER_CRITICAL(&audioStateMux);
-    if (audioState == AudioState::IDLE) {
-      audioState = AudioState::RECORDING;
-      accepted = true;
-    }
-    portEXIT_CRITICAL(&audioStateMux);
-    if (!accepted) {
-      continue;
-    }
-
 
     Serial.println("Recording...");
     pcmDataLength = 0;
@@ -88,5 +77,6 @@ void microTask(void* pvParameters) {
     }
 
     Serial.println("Recording Over");
+        xTaskNotifyGive(httpTaskHandle);
   }
 }
