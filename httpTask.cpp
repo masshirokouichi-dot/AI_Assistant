@@ -51,6 +51,7 @@ void httpTask(void* pvParameters) {
     camera_fb_t *image = esp_camera_fb_get();
     if (image == nullptr) {
       Serial.println("Camera capture failed");
+      notifyNext = true;
       error();
       continue;
     }
