@@ -3,9 +3,8 @@
 #include "camera.h"
 #include "httpTask.h"
 
-
+// 第一次按下启动http，第二次按下结束录音
 static bool notifyNext = true;
-
 void IRAM_ATTR startButton() {
   unsigned long currentTime = millis();
 
@@ -47,7 +46,13 @@ void httpTask(void* pvParameters) {
     if (!accepted) {
       continue;
     }
-  
+
+
+    cameraInit();
+    for (int i = 0; i < 3; i++){
+      esp_camera_fb_return(esp_camera_fb_get());
+    }
+    // esp_camera_fb_return(esp_camera_fb_get());
     camera_fb_t *image = esp_camera_fb_get();
     if (image == nullptr) {
       Serial.println("Camera capture failed");
@@ -61,9 +66,12 @@ void httpTask(void* pvParameters) {
       image->height,
       image->len
     );
+
     
     xTaskNotifyGive(microTaskHandle);
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    notifyToLed(HTTP_WAITING);
 
     if (WiFi.status() == WL_CONNECTED) {
       WiFiClient client;
@@ -72,11 +80,9 @@ void httpTask(void* pvParameters) {
 
       http.begin(
         client,
-        "http://192.168.137.1:8080/askGemini"
+        "http://192.168.137.1:8080/askAI"
       );
       http.setTimeout(60000);
-
-      notifyToLed(HTTP_WAITING);
       
       const String boundary = "Esp32Boundary7e43a9";
       String imageHeader =
@@ -121,9 +127,12 @@ void httpTask(void* pvParameters) {
 
       int httpCode = http.POST(body, length);
 
-      free(body);
+      safeFree((void **)&body);
       esp_camera_fb_return(image);
       image = nullptr;
+
+      esp_camera_deinit();
+
   
       if (httpCode == 200) {
         Serial.printf("HTTPS Code: %d\n", httpCode);
@@ -239,13 +248,4 @@ void error() {
   portENTER_CRITICAL(&audioStateMux);
   audioState = AudioState::IDLE;
   portEXIT_CRITICAL(&audioStateMux);
-}
-
-
-void notifyToLed(uint32_t status) {
-  xTaskNotify(
-    ledTaskHandle,
-    status,
-    eSetValueWithOverwrite
-  );
 }

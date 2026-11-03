@@ -18,12 +18,14 @@ extern size_t pcmDataLength;
 
 
 extern void safeFree(void **ptr);
+void notifyToLed(uint32_t status);
 
 enum HttpStatus: uint32_t{
   HTTP_WAITING = 0,
   HTTP_SUCCESS = 1,
   HTTP_WARNING = 2,
-  HTTP_FAILED = 3
+  HTTP_FAILED = 3,
+  LED_RECORDING = 4
 };
 enum class AudioState : uint8_t {
   IDLE,

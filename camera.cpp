@@ -38,12 +38,8 @@ void cameraInit() {
 
   if (psramFound()) {
     config.fb_location = CAMERA_FB_IN_PSRAM;
-    config.frame_size = FRAMESIZE_SXGA;
-    config.jpeg_quality = 10;
-    config.fb_count = 2;
-  }
-  else {
-    config.fb_count = 1;
+    config.frame_size = FRAMESIZE_UXGA;
+    config.jpeg_quality = 5;
   }
 
   esp_err_t err = esp_camera_init(&config);
@@ -55,7 +51,7 @@ void cameraInit() {
     );
     return;
   }
-  Serial.println("Camera init OK");
+  // Serial.println("Camera init OK");
 } 
 
 // int cameraTake(String *p) {

@@ -34,6 +34,8 @@ void microTask(void* pvParameters) {
   while (1) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
+    notifyToLed(LED_RECORDING);
+
     Serial.println("Recording...");
     pcmDataLength = 0;
     safeFree((void**)&pcmData);
@@ -77,6 +79,6 @@ void microTask(void* pvParameters) {
     }
 
     Serial.println("Recording Over");
-        xTaskNotifyGive(httpTaskHandle);
+    xTaskNotifyGive(httpTaskHandle);
   }
 }

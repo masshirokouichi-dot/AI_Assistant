@@ -21,6 +21,14 @@ void safeFree(void **ptr) {
   *ptr = nullptr;
 }
 
+void notifyToLed(uint32_t status) {
+  xTaskNotify(
+    ledTaskHandle,
+    status,
+    eSetValueWithOverwrite
+  );
+}
+
 // bool taskState(AudioState state, AudioState thisState) {
 //   portENTER_CRITICAL(&audioStateMux);
 //   if (audioState == AudioState::IDLE) {

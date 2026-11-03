@@ -14,11 +14,10 @@ void startButton();
 void httpTask(void* pvParameters);
 
 void error();
-void notifyToLed(uint32_t status);
 // int process(String *response, char **audioBase64);
 int base64ToPcm(const char *audioBase64, char **pcmData);
 
 // void safeFree(void **ptr);
 // const AIConfig& getAIConfig(AIModel Model);
 
-#endif 
+#endif
