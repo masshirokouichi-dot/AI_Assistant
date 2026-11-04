@@ -13,6 +13,7 @@ void startButton();
 
 void httpTask(void* pvParameters);
 
+void cancelRound(camera_fb_t *&image);
 void error();
 // int process(String *response, char **audioBase64);
 int base64ToPcm(const char *audioBase64, char **pcmData);

@@ -3,27 +3,31 @@
 #include "camera.h"
 #include "httpTask.h"
 
-// 第一次按下启动http，第二次按下结束录音
-static bool notifyNext = true;
+// 待機中はリクエストを開始し、録音中は録音を終了する。
 void IRAM_ATTR startButton() {
   unsigned long currentTime = millis();
 
   if (currentTime - lastInterruptTime > debounceInterval) {
     BaseType_t higherPriorityTaskWoken = pdFALSE;
 
-    TaskHandle_t target = notifyNext
-      ? httpTaskHandle
-      : microTaskHandle;
+    TaskHandle_t target = nullptr;
+    portENTER_CRITICAL_ISR(&audioStateMux);
+    if (audioState == AudioState::IDLE) {
+      target = httpTaskHandle;
+    }
+    else if (audioState == AudioState::RECORDING) {
+      target = microTaskHandle;
+    }
+    portEXIT_CRITICAL_ISR(&audioStateMux);
 
-    vTaskNotifyGiveFromISR(
-      target,
-      &higherPriorityTaskWoken
-    );
+    if (target != nullptr) {
+      vTaskNotifyGiveFromISR(
+        target,
+        &higherPriorityTaskWoken
+      );
 
-    notifyNext = !notifyNext;
-
-
-    portYIELD_FROM_ISR(higherPriorityTaskWoken);
+      portYIELD_FROM_ISR(higherPriorityTaskWoken);
+    }
   }
 
   lastInterruptTime = currentTime;
@@ -47,6 +51,12 @@ void httpTask(void* pvParameters) {
       continue;
     }
 
+    // Wi-Fi 未接続の場合は、撮影や録音を開始せずに処理を終了する。
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("WiFi not connected, request ignored.");
+      error();
+      continue;
+    }
 
     cameraInit();
     for (int i = 0; i < 3; i++){
@@ -56,8 +66,7 @@ void httpTask(void* pvParameters) {
     camera_fb_t *image = esp_camera_fb_get();
     if (image == nullptr) {
       Serial.println("Camera capture failed");
-      notifyNext = true;
-      error();
+      cancelRound(image);
       continue;
     }
     Serial.printf(
@@ -67,9 +76,28 @@ void httpTask(void* pvParameters) {
       image->len
     );
 
-    
+    // 撮影後、録音を開始する前に Wi-Fi 接続を再確認する。
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("WiFi disconnected before recording.");
+      cancelRound(image);
+      continue;
+    }
+
+    portENTER_CRITICAL(&audioStateMux);
+    audioState = AudioState::RECORDING;
+    portEXIT_CRITICAL(&audioStateMux);
+
     xTaskNotifyGive(microTaskHandle);
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    // Wi-Fi が切断された場合や録音データが無効な場合は、今回のデータを破棄する。
+    if (WiFi.status() != WL_CONNECTED ||
+        pcmData == nullptr ||
+        pcmDataLength == 0) {
+      Serial.println("Network unavailable or recording invalid.");
+      cancelRound(image);
+      continue;
+    }
 
     notifyToLed(HTTP_WAITING);
 
@@ -104,6 +132,8 @@ void httpTask(void* pvParameters) {
       uint8_t* body = (uint8_t*)ps_malloc(length);
       if (!body) {
         Serial.println("Upload buffer allocation failed");
+        http.end();
+        cancelRound(image);
         continue;
       }
 
@@ -240,7 +270,25 @@ void httpTask(void* pvParameters) {
       }
       http.end();
     }
+    else {
+      Serial.println("WiFi disconnected before upload.");
+      cancelRound(image);
+    }
   }
+}
+
+void cancelRound(camera_fb_t *&image) {
+  if (image != nullptr) {
+    esp_camera_fb_return(image);
+    image = nullptr;
+  }
+
+  esp_camera_deinit();
+
+  safeFree((void **)&pcmData);
+  pcmDataLength = 0;
+
+  error();
 }
 
 void error() {

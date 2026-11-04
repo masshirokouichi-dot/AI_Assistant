@@ -79,6 +79,11 @@ void microTask(void* pvParameters) {
     }
 
     Serial.println("Recording Over");
+
+    portENTER_CRITICAL(&audioStateMux);
+    audioState = AudioState::HTTP;
+    portEXIT_CRITICAL(&audioStateMux);
+
     xTaskNotifyGive(httpTaskHandle);
   }
 }
